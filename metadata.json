@@ -1,0 +1,5 @@
+{
+  "name": "PointAllocator",
+  "description": "A credit card reward optimization and simulation tool to maximize point earnings based on monthly spend, rent, and redemption strategies.",
+  "requestFramePermissions": []
+}
