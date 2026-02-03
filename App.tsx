@@ -32,6 +32,9 @@ export default function App() {
   const [optimizationProgress, setOptimizationProgress] = useState(0);
   const optimizationRef = useRef<{ cancel: boolean }>({ cancel: false });
 
+  // Credit Value Overrides (Key: cardId-creditId, Value: number)
+  const [creditValues, setCreditValues] = useState<Record<string, number>>({});
+
   // Global Boost Settings
   const [boostSettings, setBoostSettings] = useState<BoostSettings>({
     Chase: null, 
@@ -49,7 +52,7 @@ export default function App() {
 
   const totalMonthlySpend = useMemo(() => {
     const rent = parseInt(globalSettings.rent.toString() || '0');
-    const catSpend = Object.values(spendValues).reduce((a, b) => a + (b || 0), 0);
+    const catSpend = Object.values(spendValues).reduce((a: number, b: number) => a + (b || 0), 0);
     return rent + catSpend;
   }, [globalSettings.rent, spendValues]);
 
@@ -66,6 +69,13 @@ export default function App() {
     }
   ]);
   const [chartScenarioId, setChartScenarioId] = useState<number | null>(null);
+
+  const updateCreditValue = (cardId: string, creditId: string, value: number) => {
+    setCreditValues(prev => ({
+      ...prev,
+      [`${cardId}-${creditId}`]: value
+    }));
+  };
 
   // --- Calculations ---
   const scenariosData: ScenarioData[] = useMemo(() => {
@@ -107,7 +117,10 @@ export default function App() {
       
       // Credits Calculation
       const totalCredits = scenarioActiveCards.reduce((acc, card) => {
-        const cCredits = card.credits ? card.credits.reduce((sum, cr) => sum + cr.amount, 0) : 0;
+        const cCredits = card.credits ? card.credits.reduce((sum, cr) => {
+           const val = creditValues[`${card.id}-${cr.id}`] ?? cr.defaultUserValue;
+           return sum + val;
+        }, 0) : 0;
         return acc + cCredits;
       }, 0);
 
@@ -134,7 +147,7 @@ export default function App() {
         totalPointsVal
       };
     });
-  }, [scenarios, globalSettings, spendValues, boostSettings]);
+  }, [scenarios, globalSettings, spendValues, boostSettings, creditValues]);
 
   // --- Handlers ---
   
@@ -325,7 +338,10 @@ export default function App() {
            const totalAllocations = Math.pow(subset.length, cats.length);
            const subsetFees = subset.reduce((acc, c) => acc + (c.annualFee || 0), 0);
            const subsetCredits = subset.reduce((acc, c) => {
-              const cCredits = c.credits ? c.credits.reduce((s, cr) => s + cr.amount, 0) : 0;
+              const cCredits = c.credits ? c.credits.reduce((s, cr) => {
+                 const val = creditValues[`${c.id}-${cr.id}`] ?? cr.defaultUserValue;
+                 return s + val;
+              }, 0) : 0;
               return acc + cCredits;
            }, 0);
            const hasBilt = subset.some(c => c.ecosystem === 'Bilt');
@@ -782,12 +798,15 @@ export default function App() {
                                               <span>-${card.annualFee}</span>
                                           </div>
                                       )}
-                                      {card.credits?.map((credit, idx) => (
-                                          <div key={`${card.id}-credit-${idx}`} className="flex justify-between text-xs text-emerald-600">
-                                              <span>{card.name} {credit.label}</span>
-                                              <span>+${credit.amount}</span>
-                                          </div>
-                                      ))}
+                                      {card.credits?.map((credit) => {
+                                          const creditVal = creditValues[`${card.id}-${credit.id}`] ?? credit.defaultUserValue;
+                                          return (
+                                            <div key={`${card.id}-credit-${credit.id}`} className="flex justify-between text-xs text-emerald-600">
+                                                <span>{card.name} {credit.label}</span>
+                                                <span title={`Face Value: $${credit.faceValue}`}>+${creditVal}</span>
+                                            </div>
+                                          );
+                                      })}
                                   </React.Fragment>
                               ))}
                               <div className="flex justify-between text-xs font-bold text-slate-600 pt-1 mt-1 border-t border-slate-100/50">
@@ -890,7 +909,7 @@ export default function App() {
             })}
           </div>
         ) : (
-          <ConfigView />
+          <ConfigView creditValues={creditValues} onUpdateCreditValue={updateCreditValue} />
         )}
       </main>
 

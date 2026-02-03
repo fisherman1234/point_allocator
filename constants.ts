@@ -18,12 +18,12 @@ export const CARDS: CardConfig[] = [
       { id: 'base', label: 'Other Spend', multiplier: 1, icon: DollarSign, accepts: ['base', 'travel', 'amazon_spend', 'internet'] }, 
     ],
     credits: [
-      { label: 'Travel Credit', amount: 300 },
-      { label: 'StubHub Credit (Valued)', amount: 200 },
-      { label: 'Lyft Credit', amount: 120 },
-      { label: 'Apple Subscriptions', amount: 288 },
-      { label: 'Dining Credit', amount: 300 },
-      { label: 'DoorDash Promos (Valued)', amount: 200 }
+      { id: 'travel', label: 'Travel Credit', faceValue: 300, defaultUserValue: 300 },
+      { id: 'stubhub', label: 'StubHub Credit', faceValue: 300, defaultUserValue: 200 },
+      { id: 'lyft', label: 'Lyft Credit', faceValue: 120, defaultUserValue: 120 },
+      { id: 'apple', label: 'Apple Subscriptions', faceValue: 288, defaultUserValue: 288 },
+      { id: 'dining', label: 'Dining Credit', faceValue: 300, defaultUserValue: 300 },
+      { id: 'doordash', label: 'DoorDash Promos', faceValue: 300, defaultUserValue: 200 }
     ]
   },
   {
@@ -101,7 +101,7 @@ export const CARDS: CardConfig[] = [
       { id: 'base', label: 'Other Spend', multiplier: 1.5, icon: DollarSign, accepts: ['base', 'travel', 'amazon_spend', 'internet'] },
     ],
     credits: [
-      { label: 'Best Buy Credit', amount: 200 }
+      { id: 'bestbuy', label: 'Best Buy Credit', faceValue: 200, defaultUserValue: 200 }
     ]
   },
   {

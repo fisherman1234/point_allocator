@@ -11,8 +11,10 @@ export interface CardCategory {
 }
 
 export interface CardCredit {
+  id: string;
   label: string;
-  amount: number;
+  faceValue: number;
+  defaultUserValue: number;
 }
 
 export interface CardConfig {
