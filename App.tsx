@@ -66,6 +66,7 @@ export default function App() {
       useBiltCashForRent: false,
       useBiltAccelerator: false,
       useLyftCredit: false,
+      useWalgreensCredit: false,
       isDetailsExpanded: false
     }
   ]);
@@ -93,6 +94,7 @@ export default function App() {
         scenario.useBiltAccelerator, 
         globalSettings.minProtectedBalance,
         scenario.useLyftCredit,
+        scenario.useWalgreensCredit,
         boostSettings,
         scenarioActiveCards
       );
@@ -103,8 +105,8 @@ export default function App() {
       
       const realizableBiltCash = Math.min(100, biltCash);
       
-      // Update Total Cash to include realized Lyft value
-      const totalCash = amazonCash + realizableBiltCash + simulation.totalLyftRedeemed;
+      // Update Total Cash to include realized Lyft & Walgreens value
+      const totalCash = amazonCash + realizableBiltCash + simulation.totalLyftRedeemed + simulation.totalWalgreensRedeemed;
       
       const valChase = simulation.annualTotals.Chase * (ECOSYSTEMS.Chase.valuation / 100);
       const valBilt = simulation.annualTotals.Bilt * (ECOSYSTEMS.Bilt.valuation / 100);
@@ -265,6 +267,7 @@ export default function App() {
       useBiltCashForRent: false, 
       useBiltAccelerator: false, 
       useLyftCredit: false,
+      useWalgreensCredit: false,
       isDetailsExpanded: false
     }]);
   };
@@ -334,7 +337,13 @@ export default function App() {
     
     let subsetIdx = 0;
     let allocIdx = 0;
-    let topScenarios: any[] = []; 
+    
+    // Result Containers
+    let topValueCandidates: any[] = []; // Top 2 Max Overall Value
+    let topPointsCandidates: any[] = []; // Top 2 Max Points
+    let minFeeValueCandidate: any = null; // Min Fees (Max Value)
+    let minFeePointsCandidate: any = null; // Min Fees (Max Points)
+    let currentMinFee = Infinity;
     
     const processBatch = () => {
        if (optimizationRef.current.cancel) return;
@@ -357,6 +366,7 @@ export default function App() {
            const rentOptions = hasBilt ? [false, true] : [false];
            const accelOptions = hasBilt ? [false, true] : [false];
            const lyftOptions = hasBilt ? [false, true] : [false];
+           const walgreensOptions = hasBilt ? [false, true] : [false];
            
            while (allocIdx < totalAllocations) {
                 if (allocIdx % 500 === 0 && (performance.now() - startTime > YIELD_THRESHOLD)) {
@@ -376,6 +386,7 @@ export default function App() {
                 rentOptions.forEach(useBiltCashForRent => {
                   accelOptions.forEach(useAccelerator => {
                     lyftOptions.forEach(useLyftCredit => {
+                       walgreensOptions.forEach(useWalgreensCredit => {
                          const sim = simulateYear(
                             alloc,
                             spendValues,
@@ -385,6 +396,7 @@ export default function App() {
                             useAccelerator,
                             globalSettings.minProtectedBalance,
                             useLyftCredit,
+                            useWalgreensCredit,
                             boostSettings,
                             subset
                          );
@@ -395,24 +407,56 @@ export default function App() {
                          
                          const amazonCash = sim.annualTotals.Amazon / 100;
                          const biltCash = Math.min(100, sim.finalBiltCash);
-                         const totalCash = amazonCash + biltCash + sim.totalLyftRedeemed;
+                         const totalCash = amazonCash + biltCash + sim.totalLyftRedeemed + sim.totalWalgreensRedeemed;
                          
                          const netValue = valChase + valBilt + valCiti + totalCash - subsetFees + subsetCredits;
-                         
-                         if (topScenarios.length < 5 || netValue > topScenarios[topScenarios.length-1].score) {
-                             topScenarios.push({
-                                 id: `opt-${subsetIdx}-${allocIdx}-${useBiltCashForRent}-${useAccelerator}-${useLyftCredit}`,
-                                 score: netValue,
-                                 allocations: alloc,
-                                 activeCardIds: subset.map(c => c.id),
-                                 useBiltCashForRent: useBiltCashForRent,
-                                 useBiltAccelerator: useAccelerator,
-                                 useLyftCredit: useLyftCredit
-                             });
-                             
-                             topScenarios.sort((a, b) => b.score - a.score);
-                             if (topScenarios.length > 5) topScenarios.pop();
+                         const totalPoints = sim.annualTotals.Chase + sim.annualTotals.Bilt + sim.annualTotals.Citi; // Excluding Amazon to match UI
+
+                         // Candidate Creation Helper
+                         const createCandidate = () => ({
+                            id: `opt-${subsetIdx}-${allocIdx}-${useBiltCashForRent}-${useAccelerator}-${useLyftCredit}-${useWalgreensCredit}`,
+                            score: netValue,
+                            allocations: { ...alloc },
+                            activeCardIds: subset.map(c => c.id),
+                            useBiltCashForRent,
+                            useBiltAccelerator: useAccelerator,
+                            useLyftCredit,
+                            useWalgreensCredit,
+                            totalPoints,
+                            annualFees: subsetFees
+                         });
+
+                         // 1. Max Value Logic
+                         if (topValueCandidates.length < 2 || netValue > topValueCandidates[topValueCandidates.length-1].score) {
+                             const c = createCandidate();
+                             topValueCandidates.push(c);
+                             topValueCandidates.sort((a, b) => b.score - a.score);
+                             if (topValueCandidates.length > 2) topValueCandidates.pop();
                          }
+                         
+                         // 2. Max Points Logic
+                         if (topPointsCandidates.length < 2 || totalPoints > topPointsCandidates[topPointsCandidates.length-1].totalPoints) {
+                             const c = createCandidate();
+                             topPointsCandidates.push(c);
+                             topPointsCandidates.sort((a, b) => b.totalPoints - a.totalPoints);
+                             if (topPointsCandidates.length > 2) topPointsCandidates.pop();
+                         }
+
+                         // 3. Min Fees Logic
+                         if (subsetFees < currentMinFee) {
+                             currentMinFee = subsetFees;
+                             const c = createCandidate();
+                             minFeeValueCandidate = c;
+                             minFeePointsCandidate = c;
+                         } else if (subsetFees === currentMinFee) {
+                             if (!minFeeValueCandidate || netValue > minFeeValueCandidate.score) {
+                                 minFeeValueCandidate = createCandidate();
+                             }
+                             if (!minFeePointsCandidate || totalPoints > minFeePointsCandidate.totalPoints) {
+                                 minFeePointsCandidate = createCandidate();
+                             }
+                         }
+                       });
                     });
                   });
                 });
@@ -426,14 +470,43 @@ export default function App() {
        setOptimizationProgress(100);
        setIsOptimizing(false);
        
-       const newScenarios = topScenarios.map((item, idx) => ({
+       // Process results into scenarios
+       const finalScenariosMap = new Map();
+
+       const addScenarioIfUnique = (candidate: any, label: string) => {
+           if (!candidate) return;
+           const key = JSON.stringify({ 
+               alloc: candidate.allocations, 
+               cards: candidate.activeCardIds.sort(),
+               bilt: [candidate.useBiltCashForRent, candidate.useBiltAccelerator, candidate.useLyftCredit, candidate.useWalgreensCredit]
+           });
+
+           if (finalScenariosMap.has(key)) {
+               const existing = finalScenariosMap.get(key);
+               if (!existing.labels.includes(label)) existing.labels.push(label);
+           } else {
+               finalScenariosMap.set(key, { ...candidate, labels: [label] });
+           }
+       };
+
+       if (topValueCandidates[0]) addScenarioIfUnique(topValueCandidates[0], "Max Value");
+       if (topValueCandidates[1]) addScenarioIfUnique(topValueCandidates[1], "Max Value #2");
+       
+       if (topPointsCandidates[0]) addScenarioIfUnique(topPointsCandidates[0], "Max Points");
+       if (topPointsCandidates[1]) addScenarioIfUnique(topPointsCandidates[1], "Max Points #2");
+       
+       addScenarioIfUnique(minFeeValueCandidate, "Min Fees (Max Value)");
+       addScenarioIfUnique(minFeePointsCandidate, "Min Fees (Max Points)");
+
+       const newScenarios = Array.from(finalScenariosMap.values()).map((item, idx) => ({
           id: idx + 1,
-          name: `Rank #${idx+1} ($${item.score.toLocaleString(undefined, {maximumFractionDigits: 0})} Net)`,
+          name: `${item.labels.join(' & ')} ($${item.score.toLocaleString(undefined, {maximumFractionDigits: 0})})`,
           allocations: item.allocations,
           activeCardIds: item.activeCardIds,
           useBiltCashForRent: item.useBiltCashForRent,
           useBiltAccelerator: item.useBiltAccelerator,
           useLyftCredit: item.useLyftCredit,
+          useWalgreensCredit: item.useWalgreensCredit,
           isDetailsExpanded: false
         }));
         
@@ -454,7 +527,7 @@ export default function App() {
       <div className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-30 transition-all duration-300">
         <div className="max-w-[1920px] mx-auto px-6 py-4">
           
-          <div className="flex items-center justify-between">
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center">
             <div className="flex items-center gap-4">
                <div className="flex items-center gap-2">
                   <div className="bg-blue-600 text-white p-2 rounded-lg"><PieChart size={20} /></div>
@@ -482,7 +555,7 @@ export default function App() {
                 </button>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 justify-end">
                {activeView === 'simulation' && (
                  <>
                    {isOptimizing ? (
@@ -507,7 +580,7 @@ export default function App() {
                           onClick={generateOptimization} 
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-full hover:bg-indigo-700 transition-colors shadow-sm"
                         >
-                          <Sparkles size={14} /> Generate Top 5 Strategies
+                          <Sparkles size={14} /> Generate Top Strategies
                         </button>
                      </>
                    )}
@@ -793,8 +866,14 @@ export default function App() {
                               </div>
                               {scenario.simulation.totalLyftRedeemed > 0 && (
                                 <div className="flex justify-between text-xs">
-                                    <span className="text-pink-600 font-medium">Bilt (Realized)</span>
+                                    <span className="text-pink-600 font-medium">Bilt (Lyft)</span>
                                     <span className="font-bold text-slate-700">${scenario.simulation.totalLyftRedeemed.toLocaleString(undefined, {maximumFractionDigits:0})}</span>
+                                </div>
+                              )}
+                              {scenario.simulation.totalWalgreensRedeemed > 0 && (
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-red-600 font-medium">Bilt (Walgreens)</span>
+                                    <span className="font-bold text-slate-700">${scenario.simulation.totalWalgreensRedeemed.toLocaleString(undefined, {maximumFractionDigits:0})}</span>
                                 </div>
                               )}
                               <div className="flex justify-between text-xs">
@@ -876,7 +955,8 @@ export default function App() {
                         biltSettings={card.ecosystem === 'Bilt' ? {
                             rent: scenario.useBiltCashForRent,
                             accelerator: scenario.useBiltAccelerator,
-                            lyft: scenario.useLyftCredit
+                            lyft: scenario.useLyftCredit,
+                            walgreens: scenario.useWalgreensCredit
                         } : undefined}
                         onUpdateBiltSetting={(field, val) => updateScenarioField(scenario.id, field, val)}
                       />

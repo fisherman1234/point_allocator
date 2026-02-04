@@ -75,7 +75,7 @@ export const SimulationTable: React.FC<SimulationTableProps> = ({ history }) => 
               </td>
               <td className="px-2 py-2 font-mono text-red-400 bg-emerald-50/5">
                 {row.redeemedCash > 0 ? (
-                  <span title={`Rent: $${row.cashForRent.toFixed(0)}, Accel: $${row.cashForAccelerator.toFixed(0)}, Lyft: $${row.cashForLyft.toFixed(0)}, Boost: $${row.cashForBoost.toFixed(0)}`}>
+                  <span title={`Rent: $${row.cashForRent.toFixed(0)}, Accel: $${row.cashForAccelerator.toFixed(0)}, Lyft: $${row.cashForLyft.toFixed(0)}, Walgreens: $${row.cashForWalgreens.toFixed(0)}, Boost: $${row.cashForBoost.toFixed(0)}`}>
                     -{row.redeemedCash.toFixed(0)}
                   </span>
                 ) : '-'}

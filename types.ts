@@ -54,6 +54,7 @@ export interface SimulationHistoryRow {
   cashForRent: number;
   cashForAccelerator: number;
   cashForLyft: number;
+  cashForWalgreens: number;
   cashForBoost: number;
   endCash: number;
   
@@ -92,6 +93,7 @@ export interface SimulationResult {
   totalRentPointsEarned: number;
   acceleratorActivations: number;
   totalLyftRedeemed: number;
+  totalWalgreensRedeemed: number;
   totalCSPAnniversaryBonus: number;
 }
 
@@ -103,6 +105,7 @@ export interface Scenario {
   useBiltCashForRent: boolean;
   useBiltAccelerator: boolean;
   useLyftCredit: boolean;
+  useWalgreensCredit: boolean;
   isDetailsExpanded: boolean;
 }
 

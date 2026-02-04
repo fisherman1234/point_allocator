@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SpendCategoryDefinition, CardConfig } from '../types';
-import { GripVertical, ChevronDown, ChevronRight, X, Gift, TrendingUp, Zap, Car } from 'lucide-react';
+import { GripVertical, ChevronDown, ChevronRight, X, Gift, TrendingUp, Zap, Car, Pill } from 'lucide-react';
 import { DEFAULT_SPEND_CATS } from '../constants';
 import { getCardCategoryId } from '../services/simulationService';
 
@@ -38,6 +38,7 @@ interface BiltSettings {
   rent: boolean;
   accelerator: boolean;
   lyft: boolean;
+  walgreens: boolean;
 }
 
 interface CardDropZoneProps {
@@ -207,6 +208,18 @@ export const CardDropZone: React.FC<CardDropZoneProps> = ({
                             checked={biltSettings.lyft} 
                             onChange={(e) => onUpdateBiltSetting('useLyftCredit', e.target.checked)} 
                             className="accent-pink-600"
+                        />
+                    </label>
+                    <label className={`flex items-center justify-between p-2 rounded-lg border cursor-pointer transition-colors ${biltSettings.walgreens ? 'bg-red-50 border-red-100' : 'border-slate-100 hover:bg-slate-50'}`}>
+                        <div className="flex items-center gap-2">
+                            <Pill size={14} className={biltSettings.walgreens ? 'text-red-600' : 'text-slate-400'} />
+                            <span className="text-xs font-medium text-slate-700">Redeem $10/mo for Walgreens</span>
+                        </div>
+                        <input 
+                            type="checkbox" 
+                            checked={biltSettings.walgreens} 
+                            onChange={(e) => onUpdateBiltSetting('useWalgreensCredit', e.target.checked)} 
+                            className="accent-red-600"
                         />
                     </label>
                 </div>

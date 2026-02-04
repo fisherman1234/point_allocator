@@ -23,6 +23,7 @@ export const simulateYear = (
   useAccelerator: boolean,
   minBalanceInput: number | string,
   useLyftCredit: boolean,
+  useWalgreensCredit: boolean,
   boostSettings: BoostSettings,
   availableCards: CardConfig[]
 ): SimulationResult => {
@@ -80,6 +81,7 @@ export const simulateYear = (
   let acceleratorActivations = 0;
   let acceleratorSpendRemaining = 0;
   let totalLyftRedeemed = 0;
+  let totalWalgreensRedeemed = 0;
   let totalCSPAnniversaryBonus = 0;
 
   // 3. Month-by-Month Loop
@@ -88,6 +90,7 @@ export const simulateYear = (
     let cashSpentOnAccelerator = 0;
     let acceleratorBonusPoints = 0;
     let cashSpentOnLyft = 0;
+    let cashSpentOnWalgreens = 0;
     let cashSpentOnBoost = 0;
     
     // Track points added this month specifically for boosts
@@ -97,10 +100,11 @@ export const simulateYear = (
     let cspAnniversaryBonus = 0;
 
     // --- PHASE 1: Accelerator & Spend Processing (Consumption Loop) ---
-    // Rule: Burn for Rent/Lyft/MinBal must be reserved before buying accelerator packs.
+    // Rule: Burn for Rent/Lyft/Walgreens/MinBal must be reserved before buying accelerator packs.
     const estimatedRentCost = (useBiltCash && rent > 0) ? (rent * 0.03) : 0;
     const estimatedLyftCost = useLyftCredit ? 10 : 0;
-    const reservedCash = minProtectedBalance + estimatedRentCost + estimatedLyftCost;
+    const estimatedWalgreensCost = useWalgreensCredit ? 10 : 0;
+    const reservedCash = minProtectedBalance + estimatedRentCost + estimatedLyftCost + estimatedWalgreensCost;
 
     // Base Points from Spend
     cumulative.Chase += monthlyPoints.Chase;
@@ -163,8 +167,8 @@ export const simulateYear = (
     if (useBiltCash && rent > 0) {
       const maxRentPoints = rent; 
       const cashNeededForMaxPoints = (maxRentPoints / 1000) * 30; 
-      // Reserve for Lyft if needed
-      const availableForRent = Math.max(0, currentBiltCashBalance - minProtectedBalance - estimatedLyftCost);
+      // Reserve for Lyft/Walgreens if needed
+      const availableForRent = Math.max(0, currentBiltCashBalance - minProtectedBalance - estimatedLyftCost - estimatedWalgreensCost);
       const cashToUse = Math.min(availableForRent, cashNeededForMaxPoints);
       
       if (cashToUse > 0) {
@@ -181,14 +185,25 @@ export const simulateYear = (
 
     // --- PHASE 4: Lyft Redemption ($10/mo) ---
     if (useLyftCredit) {
-      // Must have enough over protected balance
-      const availableForLyft = Math.max(0, currentBiltCashBalance - minProtectedBalance);
+      // Must have enough over protected balance (and reserve for Walgreens)
+      const availableForLyft = Math.max(0, currentBiltCashBalance - minProtectedBalance - estimatedWalgreensCost);
       if (availableForLyft >= 10) {
         currentBiltCashBalance -= 10;
         cashSpentOnLyft = 10;
         totalLyftRedeemed += 10;
       }
     }
+
+    // --- PHASE 4b: Walgreens Redemption ($10/mo) - Lower Priority than Lyft ---
+    if (useWalgreensCredit) {
+        // Must have enough over protected balance
+        const availableForWalgreens = Math.max(0, currentBiltCashBalance - minProtectedBalance);
+        if (availableForWalgreens >= 10) {
+          currentBiltCashBalance -= 10;
+          cashSpentOnWalgreens = 10;
+          totalWalgreensRedeemed += 10;
+        }
+      }
 
     // --- PHASE 5: Milestones ---
     const previousGrossPoints = grossBiltPointsEarned;
@@ -238,10 +253,11 @@ export const simulateYear = (
       startCash,
       earnedCash: monthlyBiltCashEarned,
       milestoneBonusCash,
-      redeemedCash: cashRedeemedThisMonth + cashSpentOnAccelerator + cashSpentOnLyft + cashSpentOnBoost,
+      redeemedCash: cashRedeemedThisMonth + cashSpentOnAccelerator + cashSpentOnLyft + cashSpentOnWalgreens + cashSpentOnBoost,
       cashForRent: cashRedeemedThisMonth,
       cashForAccelerator: cashSpentOnAccelerator,
       cashForLyft: cashSpentOnLyft,
+      cashForWalgreens: cashSpentOnWalgreens,
       cashForBoost: cashSpentOnBoost,
       endCash: currentBiltCashBalance,
       
@@ -278,6 +294,7 @@ export const simulateYear = (
     totalRentPointsEarned,
     acceleratorActivations,
     totalLyftRedeemed,
+    totalWalgreensRedeemed,
     totalCSPAnniversaryBonus
   };
 };
