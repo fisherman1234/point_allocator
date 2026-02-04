@@ -147,7 +147,7 @@ export const DEFAULT_SPEND_CATS: SpendCategoryDefinition[] = [
   { id: 'others', label: 'Others', type: 'base', defaultAmount: 3127, icon: DollarSign, color: 'bg-slate-100 text-slate-700 border-slate-200' },
 ];
 
-export const INITIAL_RENT = 3309;
+export const INITIAL_RENT = 3312;
 export const INITIAL_CASH = 500;
-export const INITIAL_MIN_BALANCE = 100;
+export const INITIAL_MIN_BALANCE = 75;
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
