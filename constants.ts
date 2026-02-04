@@ -5,10 +5,10 @@ import {
 import { CardConfig, SpendCategoryDefinition, Ecosystem, EcosystemConfig } from './types';
 
 export const ECOSYSTEMS: Record<Ecosystem, EcosystemConfig> = {
-  Chase: { id: 'Chase', label: 'Chase', valuation: 2.0, color: 'text-blue-600' },
-  Bilt: { id: 'Bilt', label: 'Bilt', valuation: 2.0, color: 'text-stone-600' },
-  Citi: { id: 'Citi', label: 'Citi', valuation: 1.5, color: 'text-teal-600' },
-  Amazon: { id: 'Amazon', label: 'Amazon', valuation: 1.0, color: 'text-yellow-600' },
+  Chase: { id: 'Chase', label: 'Chase', valuation: 1.75, color: 'text-blue-600', boostValue: 0.25, boostProbability: 1.0 },
+  Bilt: { id: 'Bilt', label: 'Bilt', valuation: 1.75, color: 'text-stone-600', boostValue: 0.25, boostProbability: 0.5 },
+  Citi: { id: 'Citi', label: 'Citi', valuation: 1.5, color: 'text-teal-600', boostValue: 0.25, boostProbability: 1.0 },
+  Amazon: { id: 'Amazon', label: 'Amazon', valuation: 1.0, color: 'text-yellow-600', boostValue: 0, boostProbability: 0 },
 };
 
 export const CARDS: CardConfig[] = [
@@ -46,6 +46,9 @@ export const CARDS: CardConfig[] = [
       { id: 'dining', label: 'Dining', multiplier: 3, icon: Utensils, accepts: ['dining', 'dining_evening'] },
       { id: 'travel', label: 'Travel', multiplier: 2, icon: Plane, accepts: ['travel', 'airfare'] },
       { id: 'base', label: 'Other Spend', multiplier: 1, icon: DollarSign, accepts: ['base', 'amazon_spend', 'internet'] },
+    ],
+    credits: [
+      { id: 'doordash', label: 'DoorDash Promos', faceValue: 120, defaultUserValue: 80 }
     ]
   },
   {

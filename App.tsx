@@ -199,9 +199,9 @@ export default function App() {
   
   const generateBoostEvents = () => {
     setBoostSettings({
-      Chase: Math.floor(Math.random() * 12) + 1,
-      Citi: Math.floor(Math.random() * 12) + 1,
-      Bilt: Math.floor(Math.random() * 12) + 1
+      Chase: Math.random() < ECOSYSTEMS.Chase.boostProbability ? Math.floor(Math.random() * 12) + 1 : null,
+      Citi: Math.random() < ECOSYSTEMS.Citi.boostProbability ? Math.floor(Math.random() * 12) + 1 : null,
+      Bilt: Math.random() < ECOSYSTEMS.Bilt.boostProbability ? Math.floor(Math.random() * 12) + 1 : null
     });
   };
 
@@ -296,7 +296,7 @@ export default function App() {
       activeCardIds: [...globalAvailableCardIds],
       useBiltCashForRent: false, 
       useBiltAccelerator: false, 
-      useSmartOverflow: false,
+      useSmartOverflow: false, 
       useLyftCredit: false,
       useWalgreensCredit: false,
       isDetailsExpanded: false

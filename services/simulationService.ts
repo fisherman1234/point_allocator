@@ -1,4 +1,4 @@
-import { CARDS, DEFAULT_SPEND_CATS } from '../constants';
+import { CARDS, DEFAULT_SPEND_CATS, ECOSYSTEMS } from '../constants';
 import { BoostSettings, CardConfig, SimulationResult, Ecosystem } from '../types';
 
 // Map a Spend Type (dining, travel, base) to a Card's specific Category ID
@@ -318,16 +318,16 @@ export const simulateYear = (
     let boostBonusBilt = 0;
     
     if (boostSettings) {
-      // Chase Boost: 25% on points accumulated until now
+      // Chase Boost
       if (boostSettings.Chase === month) {
-        boostBonusChase = cumulative.Chase * 0.25;
+        boostBonusChase = cumulative.Chase * ECOSYSTEMS.Chase.boostValue;
         cumulative.Chase += boostBonusChase;
         chasePointsThisMonth += boostBonusChase;
       }
       
-      // Citi Boost: 25% on points accumulated until now
+      // Citi Boost
       if (boostSettings.Citi === month) {
-        boostBonusCiti = cumulative.Citi * 0.25;
+        boostBonusCiti = cumulative.Citi * ECOSYSTEMS.Citi.boostValue;
         cumulative.Citi += boostBonusCiti;
         citiPointsThisMonth += boostBonusCiti;
       }
@@ -339,7 +339,7 @@ export const simulateYear = (
           cashSpentOnBoost = 75;
           currentBiltCashBalance -= 75;
           
-          boostBonusBilt = cumulative.Bilt * 0.5;
+          boostBonusBilt = cumulative.Bilt * ECOSYSTEMS.Bilt.boostValue;
           cumulative.Bilt += boostBonusBilt;
           biltPointsThisMonth += boostBonusBilt;
         }

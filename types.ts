@@ -7,6 +7,8 @@ export interface EcosystemConfig {
   label: string;
   valuation: number; // Cents per point
   color: string;
+  boostValue: number; // Multiplier (e.g. 0.25 for 25%)
+  boostProbability: number; // Probability of boost occurring in a year (0 to 1)
 }
 
 export interface CardCategory {
