@@ -70,6 +70,7 @@ export interface SimulationHistoryRow {
   boostBonusChase: number;
   boostBonusCiti: number;
   boostBonusBilt: number;
+  overflowBonus: number;
 
   Chase: number;
   Bilt: number;
@@ -95,6 +96,7 @@ export interface SimulationResult {
   totalLyftRedeemed: number;
   totalWalgreensRedeemed: number;
   totalCSPAnniversaryBonus: number;
+  totalSmartOverflowGain: number;
 }
 
 export interface Scenario {
@@ -104,6 +106,7 @@ export interface Scenario {
   activeCardIds: string[];
   useBiltCashForRent: boolean;
   useBiltAccelerator: boolean;
+  useSmartOverflow: boolean;
   useLyftCredit: boolean;
   useWalgreensCredit: boolean;
   isDetailsExpanded: boolean;

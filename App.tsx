@@ -3,7 +3,7 @@ import {
   PieChart, Plus, X, Copy, LineChart as LineChartIcon, 
   Trash2, Loader2, XCircle, ChevronUp, ChevronDown, 
   Rocket, Home, DollarSign, ShieldCheck, Trophy, Coins,
-  Sparkles
+  Sparkles, ArrowRightLeft
 } from 'lucide-react';
 
 import { CARDS, DEFAULT_SPEND_CATS, INITIAL_RENT, INITIAL_CASH, INITIAL_MIN_BALANCE, ECOSYSTEMS } from './constants';
@@ -42,8 +42,8 @@ export default function App() {
     Bilt: null
   });
   
-  // Active Cards State (Default: CSR, Ink, Bilt, Citi)
-  const [globalAvailableCardIds, setGlobalAvailableCardIds] = useState<string[]>(['csr', 'ink', 'bilt', 'citi']);
+  // Active Cards State (Default: CSR, Ink, Bilt, Citi, Amazon)
+  const [globalAvailableCardIds, setGlobalAvailableCardIds] = useState<string[]>(['csr', 'ink', 'bilt', 'citi', 'amazon']);
 
   // Global Spend Values
   const [spendValues, setSpendValues] = useState<Record<string, number>>(
@@ -60,11 +60,36 @@ export default function App() {
   const [scenarios, setScenarios] = useState<Scenario[]>([
     { 
       id: 1, 
-      name: 'Scenario 1', 
-      allocations: {}, 
-      activeCardIds: ['csr', 'ink', 'bilt', 'citi'],
-      useBiltCashForRent: false,
-      useBiltAccelerator: false,
+      name: 'QA: Bilt + Amazon', 
+      allocations: DEFAULT_SPEND_CATS.reduce((acc, cat) => ({ ...acc, [cat.id]: 'bilt' }), {} as Record<string, string>), 
+      activeCardIds: ['bilt', 'amazon'],
+      useBiltCashForRent: true,
+      useBiltAccelerator: true,
+      useSmartOverflow: true,
+      useLyftCredit: false,
+      useWalgreensCredit: false,
+      isDetailsExpanded: false
+    },
+    { 
+      id: 2, 
+      name: 'QA: Bilt + Citi', 
+      allocations: DEFAULT_SPEND_CATS.reduce((acc, cat) => ({ ...acc, [cat.id]: 'bilt' }), {} as Record<string, string>), 
+      activeCardIds: ['bilt', 'citi'],
+      useBiltCashForRent: true,
+      useBiltAccelerator: true,
+      useSmartOverflow: true,
+      useLyftCredit: false,
+      useWalgreensCredit: false,
+      isDetailsExpanded: false
+    },
+    { 
+      id: 3, 
+      name: 'QA: Bilt + Citi + Amazon', 
+      allocations: DEFAULT_SPEND_CATS.reduce((acc, cat) => ({ ...acc, [cat.id]: 'bilt' }), {} as Record<string, string>), 
+      activeCardIds: ['bilt', 'citi', 'amazon'],
+      useBiltCashForRent: true,
+      useBiltAccelerator: true,
+      useSmartOverflow: true,
       useLyftCredit: false,
       useWalgreensCredit: false,
       isDetailsExpanded: false
@@ -83,7 +108,11 @@ export default function App() {
   const scenariosData: ScenarioData[] = useMemo(() => {
     return scenarios.map(scenario => {
       // Calculate active cards for THIS scenario
-      const scenarioActiveCards = CARDS.filter(c => scenario.activeCardIds.includes(c.id));
+      // FIX: Ensure we only include cards that are both active in the scenario AND available globally
+      // This prevents "hidden" cards (unchecked in Global) from influencing the simulation (e.g., smart overflow)
+      const scenarioActiveCards = CARDS.filter(c => 
+        scenario.activeCardIds.includes(c.id) && globalAvailableCardIds.includes(c.id)
+      );
       
       const simulation = simulateYear(
         scenario.allocations,
@@ -96,7 +125,8 @@ export default function App() {
         scenario.useLyftCredit,
         scenario.useWalgreensCredit,
         boostSettings,
-        scenarioActiveCards
+        scenarioActiveCards,
+        scenario.useSmartOverflow
       );
       
       const totalPointsOnly = simulation.annualTotals.Chase + simulation.annualTotals.Bilt + simulation.annualTotals.Citi;
@@ -150,7 +180,7 @@ export default function App() {
         totalPointsVal
       };
     });
-  }, [scenarios, globalSettings, spendValues, boostSettings, creditValues]);
+  }, [scenarios, globalSettings, spendValues, boostSettings, creditValues, globalAvailableCardIds]);
 
   // --- Handlers ---
   
@@ -266,6 +296,7 @@ export default function App() {
       activeCardIds: [...globalAvailableCardIds],
       useBiltCashForRent: false, 
       useBiltAccelerator: false, 
+      useSmartOverflow: false,
       useLyftCredit: false,
       useWalgreensCredit: false,
       isDetailsExpanded: false
@@ -385,78 +416,85 @@ export default function App() {
                 
                 rentOptions.forEach(useBiltCashForRent => {
                   accelOptions.forEach(useAccelerator => {
-                    lyftOptions.forEach(useLyftCredit => {
-                       walgreensOptions.forEach(useWalgreensCredit => {
-                         const sim = simulateYear(
-                            alloc,
-                            spendValues,
-                            globalSettings.rent,
-                            useBiltCashForRent,
-                            globalSettings.initialBiltCash,
-                            useAccelerator,
-                            globalSettings.minProtectedBalance,
-                            useLyftCredit,
-                            useWalgreensCredit,
-                            boostSettings,
-                            subset
-                         );
-                         
-                         const valChase = sim.annualTotals.Chase * (ECOSYSTEMS.Chase.valuation / 100);
-                         const valBilt = sim.annualTotals.Bilt * (ECOSYSTEMS.Bilt.valuation / 100);
-                         const valCiti = sim.annualTotals.Citi * (ECOSYSTEMS.Citi.valuation / 100);
-                         
-                         const amazonCash = sim.annualTotals.Amazon / 100;
-                         const biltCash = Math.min(100, sim.finalBiltCash);
-                         const totalCash = amazonCash + biltCash + sim.totalLyftRedeemed + sim.totalWalgreensRedeemed;
-                         
-                         const netValue = valChase + valBilt + valCiti + totalCash - subsetFees + subsetCredits;
-                         const totalPoints = sim.annualTotals.Chase + sim.annualTotals.Bilt + sim.annualTotals.Citi; // Excluding Amazon to match UI
+                    // Smart overflow option only matters if accelerator is on
+                    const overflowOptions = (useAccelerator) ? [false, true] : [false];
 
-                         // Candidate Creation Helper
-                         const createCandidate = () => ({
-                            id: `opt-${subsetIdx}-${allocIdx}-${useBiltCashForRent}-${useAccelerator}-${useLyftCredit}-${useWalgreensCredit}`,
-                            score: netValue,
-                            allocations: { ...alloc },
-                            activeCardIds: subset.map(c => c.id),
-                            useBiltCashForRent,
-                            useBiltAccelerator: useAccelerator,
-                            useLyftCredit,
-                            useWalgreensCredit,
-                            totalPoints,
-                            annualFees: subsetFees
+                    overflowOptions.forEach(useSmartOverflow => {
+                      lyftOptions.forEach(useLyftCredit => {
+                         walgreensOptions.forEach(useWalgreensCredit => {
+                           const sim = simulateYear(
+                              alloc,
+                              spendValues,
+                              globalSettings.rent,
+                              useBiltCashForRent,
+                              globalSettings.initialBiltCash,
+                              useAccelerator,
+                              globalSettings.minProtectedBalance,
+                              useLyftCredit,
+                              useWalgreensCredit,
+                              boostSettings,
+                              subset,
+                              useSmartOverflow
+                           );
+                           
+                           const valChase = sim.annualTotals.Chase * (ECOSYSTEMS.Chase.valuation / 100);
+                           const valBilt = sim.annualTotals.Bilt * (ECOSYSTEMS.Bilt.valuation / 100);
+                           const valCiti = sim.annualTotals.Citi * (ECOSYSTEMS.Citi.valuation / 100);
+                           
+                           const amazonCash = sim.annualTotals.Amazon / 100;
+                           const biltCash = Math.min(100, sim.finalBiltCash);
+                           const totalCash = amazonCash + biltCash + sim.totalLyftRedeemed + sim.totalWalgreensRedeemed;
+                           
+                           const netValue = valChase + valBilt + valCiti + totalCash - subsetFees + subsetCredits;
+                           const totalPoints = sim.annualTotals.Chase + sim.annualTotals.Bilt + sim.annualTotals.Citi; // Excluding Amazon to match UI
+
+                           // Candidate Creation Helper
+                           const createCandidate = () => ({
+                              id: `opt-${subsetIdx}-${allocIdx}-${useBiltCashForRent}-${useAccelerator}-${useLyftCredit}-${useWalgreensCredit}-${useSmartOverflow}`,
+                              score: netValue,
+                              allocations: { ...alloc },
+                              activeCardIds: subset.map(c => c.id),
+                              useBiltCashForRent,
+                              useBiltAccelerator: useAccelerator,
+                              useLyftCredit,
+                              useWalgreensCredit,
+                              useSmartOverflow,
+                              totalPoints,
+                              annualFees: subsetFees
+                           });
+
+                           // 1. Max Value Logic
+                           if (topValueCandidates.length < 2 || netValue > topValueCandidates[topValueCandidates.length-1].score) {
+                               const c = createCandidate();
+                               topValueCandidates.push(c);
+                               topValueCandidates.sort((a, b) => b.score - a.score);
+                               if (topValueCandidates.length > 2) topValueCandidates.pop();
+                           }
+                           
+                           // 2. Max Points Logic
+                           if (topPointsCandidates.length < 2 || totalPoints > topPointsCandidates[topPointsCandidates.length-1].totalPoints) {
+                               const c = createCandidate();
+                               topPointsCandidates.push(c);
+                               topPointsCandidates.sort((a, b) => b.totalPoints - a.totalPoints);
+                               if (topPointsCandidates.length > 2) topPointsCandidates.pop();
+                           }
+
+                           // 3. Min Fees Logic
+                           if (subsetFees < currentMinFee) {
+                               currentMinFee = subsetFees;
+                               const c = createCandidate();
+                               minFeeValueCandidate = c;
+                               minFeePointsCandidate = c;
+                           } else if (subsetFees === currentMinFee) {
+                               if (!minFeeValueCandidate || netValue > minFeeValueCandidate.score) {
+                                   minFeeValueCandidate = createCandidate();
+                               }
+                               if (!minFeePointsCandidate || totalPoints > minFeePointsCandidate.totalPoints) {
+                                   minFeePointsCandidate = createCandidate();
+                               }
+                           }
                          });
-
-                         // 1. Max Value Logic
-                         if (topValueCandidates.length < 2 || netValue > topValueCandidates[topValueCandidates.length-1].score) {
-                             const c = createCandidate();
-                             topValueCandidates.push(c);
-                             topValueCandidates.sort((a, b) => b.score - a.score);
-                             if (topValueCandidates.length > 2) topValueCandidates.pop();
-                         }
-                         
-                         // 2. Max Points Logic
-                         if (topPointsCandidates.length < 2 || totalPoints > topPointsCandidates[topPointsCandidates.length-1].totalPoints) {
-                             const c = createCandidate();
-                             topPointsCandidates.push(c);
-                             topPointsCandidates.sort((a, b) => b.totalPoints - a.totalPoints);
-                             if (topPointsCandidates.length > 2) topPointsCandidates.pop();
-                         }
-
-                         // 3. Min Fees Logic
-                         if (subsetFees < currentMinFee) {
-                             currentMinFee = subsetFees;
-                             const c = createCandidate();
-                             minFeeValueCandidate = c;
-                             minFeePointsCandidate = c;
-                         } else if (subsetFees === currentMinFee) {
-                             if (!minFeeValueCandidate || netValue > minFeeValueCandidate.score) {
-                                 minFeeValueCandidate = createCandidate();
-                             }
-                             if (!minFeePointsCandidate || totalPoints > minFeePointsCandidate.totalPoints) {
-                                 minFeePointsCandidate = createCandidate();
-                             }
-                         }
-                       });
+                      });
                     });
                   });
                 });
@@ -478,7 +516,7 @@ export default function App() {
            const key = JSON.stringify({ 
                alloc: candidate.allocations, 
                cards: candidate.activeCardIds.sort(),
-               bilt: [candidate.useBiltCashForRent, candidate.useBiltAccelerator, candidate.useLyftCredit, candidate.useWalgreensCredit]
+               bilt: [candidate.useBiltCashForRent, candidate.useBiltAccelerator, candidate.useLyftCredit, candidate.useWalgreensCredit, candidate.useSmartOverflow]
            });
 
            if (finalScenariosMap.has(key)) {
@@ -505,6 +543,7 @@ export default function App() {
           activeCardIds: item.activeCardIds,
           useBiltCashForRent: item.useBiltCashForRent,
           useBiltAccelerator: item.useBiltAccelerator,
+          useSmartOverflow: item.useSmartOverflow,
           useLyftCredit: item.useLyftCredit,
           useWalgreensCredit: item.useWalgreensCredit,
           isDetailsExpanded: false
@@ -848,6 +887,14 @@ export default function App() {
                             </div>
                           )}
 
+                          {/* Smart Overflow Gain Note */}
+                          {scenario.simulation.totalSmartOverflowGain > 0 && (
+                            <div className="flex justify-between text-[10px] text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded mt-1">
+                                <span className="font-medium flex items-center gap-1"><ArrowRightLeft size={10} /> Smart Overflow Gain</span>
+                                <span className="font-bold">+{scenario.simulation.totalSmartOverflowGain.toLocaleString()} pts</span>
+                            </div>
+                          )}
+
                           <div className="border-t border-slate-200 my-2"></div>
 
                           <div className="flex justify-between items-center mb-2">
@@ -955,6 +1002,7 @@ export default function App() {
                         biltSettings={card.ecosystem === 'Bilt' ? {
                             rent: scenario.useBiltCashForRent,
                             accelerator: scenario.useBiltAccelerator,
+                            smartOverflow: scenario.useSmartOverflow,
                             lyft: scenario.useLyftCredit,
                             walgreens: scenario.useWalgreensCredit
                         } : undefined}

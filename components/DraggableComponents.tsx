@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SpendCategoryDefinition, CardConfig } from '../types';
-import { GripVertical, ChevronDown, ChevronRight, X, Gift, TrendingUp, Zap, Car, Pill } from 'lucide-react';
+import { GripVertical, ChevronDown, ChevronRight, X, Gift, TrendingUp, Zap, Car, Pill, ArrowRightLeft } from 'lucide-react';
 import { DEFAULT_SPEND_CATS } from '../constants';
 import { getCardCategoryId } from '../services/simulationService';
 
@@ -37,6 +37,7 @@ export const DraggableSpendChip: React.FC<DraggableSpendChipProps> = ({ cat, val
 interface BiltSettings {
   rent: boolean;
   accelerator: boolean;
+  smartOverflow: boolean;
   lyft: boolean;
   walgreens: boolean;
 }
@@ -198,6 +199,26 @@ export const CardDropZone: React.FC<CardDropZoneProps> = ({
                             className="accent-amber-600"
                         />
                     </label>
+                    
+                    {/* Smart Overflow Toggle (Nested) */}
+                    {biltSettings.accelerator && (
+                        <label className={`flex items-center justify-between p-2 rounded-lg border cursor-pointer transition-colors ml-4 border-l-4 border-l-amber-200 ${biltSettings.smartOverflow ? 'bg-indigo-50 border-indigo-100' : 'border-slate-100 hover:bg-slate-50'}`}>
+                            <div className="flex items-center gap-2">
+                                <ArrowRightLeft size={14} className={biltSettings.smartOverflow ? 'text-indigo-600' : 'text-slate-400'} />
+                                <div className="flex flex-col">
+                                    <span className="text-xs font-medium text-slate-700">Smart Overflow</span>
+                                    <span className="text-[9px] text-slate-400">Re-route spend if boost inactive</span>
+                                </div>
+                            </div>
+                            <input 
+                                type="checkbox" 
+                                checked={biltSettings.smartOverflow} 
+                                onChange={(e) => onUpdateBiltSetting('useSmartOverflow', e.target.checked)} 
+                                className="accent-indigo-600"
+                            />
+                        </label>
+                    )}
+
                     <label className={`flex items-center justify-between p-2 rounded-lg border cursor-pointer transition-colors ${biltSettings.lyft ? 'bg-pink-50 border-pink-100' : 'border-slate-100 hover:bg-slate-50'}`}>
                         <div className="flex items-center gap-2">
                             <Car size={14} className={biltSettings.lyft ? 'text-pink-600' : 'text-slate-400'} />

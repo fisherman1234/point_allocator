@@ -1,5 +1,5 @@
 import { CARDS, DEFAULT_SPEND_CATS } from '../constants';
-import { BoostSettings, CardConfig, SimulationResult } from '../types';
+import { BoostSettings, CardConfig, SimulationResult, Ecosystem } from '../types';
 
 // Map a Spend Type (dining, travel, base) to a Card's specific Category ID
 export const getCardCategoryId = (cardId: string, spendType: string): string => {
@@ -14,6 +14,27 @@ export const getCardCategoryId = (cardId: string, spendType: string): string => 
   return match ? match.id : card.categories[card.categories.length - 1].id;
 };
 
+// Helper to find the best multiplier for a given spend type among available cards (excluding one specific card)
+const getBestAlternative = (spendType: string, availableCards: CardConfig[], ignoreCardId: string): { multiplier: number, ecosystem: Ecosystem } | null => {
+  let best = { multiplier: 0, ecosystem: 'Chase' as Ecosystem };
+  let found = false;
+
+  availableCards.forEach(card => {
+    if (card.id === ignoreCardId) return;
+    
+    const catId = getCardCategoryId(card.id, spendType);
+    const category = card.categories.find(c => c.id === catId);
+    const mult = category ? category.multiplier : 1;
+
+    if (mult > best.multiplier) {
+      best = { multiplier: mult, ecosystem: card.ecosystem };
+      found = true;
+    }
+  });
+
+  return found ? best : null;
+};
+
 export const simulateYear = (
   allocations: Record<string, string>,
   spendValues: Record<string, number>,
@@ -25,7 +46,8 @@ export const simulateYear = (
   useLyftCredit: boolean,
   useWalgreensCredit: boolean,
   boostSettings: BoostSettings,
-  availableCards: CardConfig[]
+  availableCards: CardConfig[],
+  useSmartOverflow: boolean = false
 ): SimulationResult => {
   const rent = typeof rentInput === 'string' ? parseInt(rentInput || '0') : rentInput;
   const minProtectedBalance = typeof minBalanceInput === 'string' ? parseFloat(minBalanceInput || '0') : minBalanceInput;
@@ -34,8 +56,9 @@ export const simulateYear = (
   // 1. Calculate Monthly Base Points & Spend based on Allocations
   const monthlyPoints = { Chase: 0, Bilt: 0, Citi: 0, Amazon: 0 };
   const monthlySpend = { Chase: 0, Bilt: 0, Citi: 0, Amazon: 0 };
-  let monthlyBiltSpend = 0; 
-  let monthlyBiltCashEarned = 0;
+  
+  // Store granular Bilt spend items for monthly processing
+  const biltSpendItems: { id: string, amount: number, type: string, baseMultiplier: number }[] = [];
   
   // Track specific card spend for CSP bonus
   let monthlyCSPSpend = 0;
@@ -54,14 +77,19 @@ export const simulateYear = (
         const categoryConfig = card.categories.find(c => c.id === targetCatId);
         const multiplier = categoryConfig ? categoryConfig.multiplier : 1;
 
-        const points = amount * multiplier;
-        
-        monthlyPoints[card.ecosystem] += points;
-        monthlySpend[card.ecosystem] += amount;
-
         if (card.ecosystem === 'Bilt') {
-          monthlyBiltSpend += amount;
-          monthlyBiltCashEarned += amount * 0.04; // 4% cash back rate on spend
+           // For Bilt, we defer calculation to the monthly loop to handle Accelerator/Overflow
+           biltSpendItems.push({
+             id: cat.id,
+             amount: amount,
+             type: cat.type,
+             baseMultiplier: multiplier
+           });
+           monthlySpend.Bilt += amount;
+        } else {
+           // Standard calculation for others
+           monthlyPoints[card.ecosystem] += amount * multiplier;
+           monthlySpend[card.ecosystem] += amount;
         }
 
         if (card.id === 'csp') {
@@ -83,6 +111,10 @@ export const simulateYear = (
   let totalLyftRedeemed = 0;
   let totalWalgreensRedeemed = 0;
   let totalCSPAnniversaryBonus = 0;
+  let totalSmartOverflowGain = 0;
+
+  // Find the active Bilt card ID for comparison logic
+  const activeBiltCard = availableCards.find(c => c.ecosystem === 'Bilt');
 
   // 3. Month-by-Month Loop
   for (let month = 1; month <= 12; month++) {
@@ -93,61 +125,118 @@ export const simulateYear = (
     let cashSpentOnWalgreens = 0;
     let cashSpentOnBoost = 0;
     
-    // Track points added this month specifically for boosts
-    let chasePointsThisMonth = 0;
-    let citiPointsThisMonth = 0;
+    // Track points added this month
+    let chasePointsThisMonth = monthlyPoints.Chase;
+    let citiPointsThisMonth = monthlyPoints.Citi;
+    let amazonPointsThisMonth = monthlyPoints.Amazon;
     let biltPointsThisMonth = 0;
     let cspAnniversaryBonus = 0;
+    let overflowBonusThisMonth = 0;
+    let monthlyBiltCashEarned = 0;
 
-    // --- PHASE 1: Accelerator & Spend Processing (Consumption Loop) ---
+    // Track actual executed spend on Bilt this month (excludes overflowed spend)
+    let executedBiltSpend = 0;
+
+    // Add standard points for non-Bilt cards
+    cumulative.Chase += monthlyPoints.Chase;
+    cumulative.Citi += monthlyPoints.Citi;
+    cumulative.Amazon += monthlyPoints.Amazon;
+
+    // --- PHASE 1: Bilt Accelerator & Spend Processing (Consumption Loop) ---
     // Rule: Burn for Rent/Lyft/Walgreens/MinBal must be reserved before buying accelerator packs.
     const estimatedRentCost = (useBiltCash && rent > 0) ? (rent * 0.03) : 0;
     const estimatedLyftCost = useLyftCredit ? 10 : 0;
     const estimatedWalgreensCost = useWalgreensCredit ? 10 : 0;
     const reservedCash = minProtectedBalance + estimatedRentCost + estimatedLyftCost + estimatedWalgreensCost;
-
-    // Base Points from Spend
-    cumulative.Chase += monthlyPoints.Chase;
-    chasePointsThisMonth += monthlyPoints.Chase;
-
-    cumulative.Citi += monthlyPoints.Citi;
-    citiPointsThisMonth += monthlyPoints.Citi;
-
-    cumulative.Amazon += monthlyPoints.Amazon;
     
-    // Bilt Base + Accelerator
-    let biltBasePoints = monthlyPoints.Bilt;
-    let remainingSpendToProcess = monthlyBiltSpend;
+    // Process Bilt Spend Item by Item
+    // We prioritize highest multiplier spend or just FIFO? Let's do FIFO for simplicity.
+    for (const item of biltSpendItems) {
+        let remainingAmount = item.amount;
+        
+        while (remainingAmount > 0) {
+            // Check capacity
+            if (acceleratorSpendRemaining > 0) {
+                // Have capacity - consume it
+                const chunk = Math.min(remainingAmount, acceleratorSpendRemaining);
+                
+                // Normal Bilt Earning (Base + 1x Boost)
+                const points = chunk * (item.baseMultiplier + 1);
+                
+                cumulative.Bilt += points;
+                biltPointsThisMonth += points;
+                acceleratorBonusPoints += chunk; // 1x is the bonus part
+                monthlyBiltCashEarned += chunk * 0.04;
 
-    while (remainingSpendToProcess > 0) {
-      // 1. If we have active capacity, use it
-      if (acceleratorSpendRemaining > 0) {
-        const amount = Math.min(remainingSpendToProcess, acceleratorSpendRemaining);
-        acceleratorBonusPoints += amount * 1; // 1x Bonus
-        acceleratorSpendRemaining -= amount;
-        remainingSpendToProcess -= amount;
-      } 
-      // 2. If no capacity, check if we should/can activate a new pack
-      else {
-        // Can we afford it?
-        const availableCash = currentBiltCashBalance - reservedCash;
-        // Rules: Must have option enabled, not hit annual limit (5), and have cash > $200
-        if (useAccelerator && acceleratorActivations < 5 && availableCash >= 200) {
-          // Buy Pack
-          currentBiltCashBalance -= 200;
-          cashSpentOnAccelerator += 200;
-          acceleratorActivations++;
-          acceleratorSpendRemaining += 5000;
-          // Continue loop -> next iteration will consume from this new capacity
-        } else {
-          // Cannot buy pack (no money, or limit reached, or disabled)
-          // Stop processing bonus for the rest of this month's spend
-          break; 
+                acceleratorSpendRemaining -= chunk;
+                remainingAmount -= chunk;
+                
+                executedBiltSpend += chunk;
+            } else {
+                // No capacity - Try to buy
+                const availableCash = currentBiltCashBalance - reservedCash - cashSpentOnAccelerator; // Important to subtract what we just spent this frame
+                
+                if (useAccelerator && acceleratorActivations < 5 && availableCash >= 200) {
+                     // Buy Pack
+                    currentBiltCashBalance -= 200;
+                    cashSpentOnAccelerator += 200;
+                    acceleratorActivations++;
+                    acceleratorSpendRemaining += 5000;
+                    // Loop continues, will consume capacity next iteration
+                } else {
+                    // Cannot buy pack.
+                    // This spend is "Unboosted".
+                    
+                    // --- SMART OVERFLOW LOGIC ---
+                    let routedToAlt = false;
+                    
+                    // Only overflow if we have exhausted our ability to buy packs (hit the limit)
+                    if (useSmartOverflow && activeBiltCard && acceleratorActivations >= 5) {
+                        const alt = getBestAlternative(item.type, availableCards, activeBiltCard.id);
+                        // Compare Bilt Base Rate vs Best Alternative Rate
+                        if (alt && alt.multiplier > item.baseMultiplier) {
+                             // Route this specific chunk to the alternative ecosystem
+                             const altPoints = remainingAmount * alt.multiplier;
+                             const biltBasePoints = remainingAmount * item.baseMultiplier;
+                             const gain = altPoints - biltBasePoints;
+                             
+                             if (alt.ecosystem === 'Chase') {
+                                 cumulative.Chase += altPoints;
+                                 chasePointsThisMonth += altPoints;
+                             } else if (alt.ecosystem === 'Citi') {
+                                 cumulative.Citi += altPoints;
+                                 citiPointsThisMonth += altPoints;
+                             } else if (alt.ecosystem === 'Amazon') {
+                                 cumulative.Amazon += altPoints;
+                                 amazonPointsThisMonth += altPoints;
+                             }
+
+                             totalSmartOverflowGain += gain;
+                             overflowBonusThisMonth += gain;
+                             
+                             // NOTE: When rerouted, we DO NOT earn Bilt Cash on this spend (user used a different card)
+                             // And we DO NOT add to executedBiltSpend
+                             
+                             routedToAlt = true;
+                             remainingAmount = 0; // Done with this item chunk
+                        }
+                    }
+
+                    if (!routedToAlt) {
+                        // Stay on Bilt at Base Rate
+                        const points = remainingAmount * item.baseMultiplier;
+                        cumulative.Bilt += points;
+                        biltPointsThisMonth += points;
+                        monthlyBiltCashEarned += remainingAmount * 0.04;
+                        executedBiltSpend += remainingAmount;
+                        remainingAmount = 0; 
+                    }
+                }
+            }
         }
-      }
     }
 
-    biltBasePoints += acceleratorBonusPoints;
+    // Add earned cash from spend (only the non-overflowed part)
     currentBiltCashBalance += monthlyBiltCashEarned;
 
     // --- PHASE 2b: CSP Anniversary Bonus (Month 12) ---
@@ -176,7 +265,9 @@ export const simulateYear = (
         rentPointsThisMonth = pointsEarned;
         cashRedeemedThisMonth = cashToUse;
         
-        biltBasePoints += pointsEarned;
+        cumulative.Bilt += pointsEarned; // Add to Bilt totals
+        biltPointsThisMonth += pointsEarned;
+        
         currentBiltCashBalance -= cashToUse;
         totalBiltCashRedeemed += cashToUse;
         totalRentPointsEarned += pointsEarned;
@@ -207,15 +298,19 @@ export const simulateYear = (
 
     // --- PHASE 5: Milestones ---
     const previousGrossPoints = grossBiltPointsEarned;
-    grossBiltPointsEarned += biltBasePoints;
+    // Gross points usually implies points earned on Bilt card (spend + rent).
+    // Does it include boost? Yes. 
+    // Does it include rent? Yes.
+    // We update this based on what was added to `cumulative.Bilt` this month.
+    // Note: If routed to Alt, it doesn't count towards Bilt milestones.
+    const biltPointsAddedThisMonth = biltPointsThisMonth; // captured above
+    grossBiltPointsEarned += biltPointsAddedThisMonth;
+    
     const milestoneBonusCash = (Math.floor(grossBiltPointsEarned / 25000) - Math.floor(previousGrossPoints / 25000)) * 50;
 
     if (milestoneBonusCash > 0) {
       currentBiltCashBalance += milestoneBonusCash;
     }
-
-    cumulative.Bilt += biltBasePoints;
-    biltPointsThisMonth += biltBasePoints;
 
     // --- PHASE 6: BOOST EVENTS ---
     let boostBonusChase = 0;
@@ -227,12 +322,14 @@ export const simulateYear = (
       if (boostSettings.Chase === month) {
         boostBonusChase = cumulative.Chase * 0.25;
         cumulative.Chase += boostBonusChase;
+        chasePointsThisMonth += boostBonusChase;
       }
       
       // Citi Boost: 25% on points accumulated until now
       if (boostSettings.Citi === month) {
         boostBonusCiti = cumulative.Citi * 0.25;
         cumulative.Citi += boostBonusCiti;
+        citiPointsThisMonth += boostBonusCiti;
       }
 
       // Bilt Boost: Burn $75 for 50% points bonus. Allows dipping below min balance.
@@ -244,6 +341,7 @@ export const simulateYear = (
           
           boostBonusBilt = cumulative.Bilt * 0.5;
           cumulative.Bilt += boostBonusBilt;
+          biltPointsThisMonth += boostBonusBilt;
         }
       }
     }
@@ -263,8 +361,8 @@ export const simulateYear = (
       
       monthlyChase: chasePointsThisMonth,
       monthlyCiti: citiPointsThisMonth,
-      monthlyAmazon: monthlyPoints.Amazon,
-      monthlyBiltSpend: monthlyPoints.Bilt,
+      monthlyAmazon: amazonPointsThisMonth,
+      monthlyBiltSpend: executedBiltSpend, 
       monthlyBiltRent: rentPointsThisMonth,
       acceleratorBonus: acceleratorBonusPoints,
       grossBiltPoints: grossBiltPointsEarned,
@@ -273,6 +371,7 @@ export const simulateYear = (
       boostBonusChase,
       boostBonusCiti,
       boostBonusBilt,
+      overflowBonus: overflowBonusThisMonth,
 
       Chase: cumulative.Chase,
       Bilt: cumulative.Bilt,
@@ -295,6 +394,7 @@ export const simulateYear = (
     acceleratorActivations,
     totalLyftRedeemed,
     totalWalgreensRedeemed,
-    totalCSPAnniversaryBonus
+    totalCSPAnniversaryBonus,
+    totalSmartOverflowGain
   };
 };
