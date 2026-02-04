@@ -2,12 +2,20 @@ import {
   CreditCard, Utensils, Plane, Moon, Wallet, Trophy, DollarSign, 
   ShoppingCart, Wifi, Home
 } from 'lucide-react';
-import { CardConfig, SpendCategoryDefinition } from './types';
+import { CardConfig, SpendCategoryDefinition, Ecosystem, EcosystemConfig } from './types';
+
+export const ECOSYSTEMS: Record<Ecosystem, EcosystemConfig> = {
+  Chase: { id: 'Chase', label: 'Chase', valuation: 2.0, color: 'text-blue-600' },
+  Bilt: { id: 'Bilt', label: 'Bilt', valuation: 2.0, color: 'text-stone-600' },
+  Citi: { id: 'Citi', label: 'Citi', valuation: 1.5, color: 'text-teal-600' },
+  Amazon: { id: 'Amazon', label: 'Amazon', valuation: 1.0, color: 'text-yellow-600' },
+};
 
 export const CARDS: CardConfig[] = [
   {
     id: 'csr',
     name: 'Sapphire Reserve',
+    multiplierDescription: '3x Dining • 4x Airfare',
     annualFee: 795,
     ecosystem: 'Chase',
     color: 'bg-blue-600',
@@ -29,6 +37,7 @@ export const CARDS: CardConfig[] = [
   {
     id: 'csp',
     name: 'Sapphire Preferred',
+    multiplierDescription: '3x Dining • 2x Travel',
     annualFee: 95,
     ecosystem: 'Chase',
     color: 'bg-blue-500',
@@ -42,6 +51,7 @@ export const CARDS: CardConfig[] = [
   {
     id: 'ink',
     name: 'Chase Ink',
+    multiplierDescription: '3x Travel • 3x Internet',
     annualFee: 95,
     ecosystem: 'Chase',
     color: 'bg-blue-700',
@@ -55,6 +65,7 @@ export const CARDS: CardConfig[] = [
   {
     id: 'bilt',
     name: 'Bilt Palladium',
+    multiplierDescription: '2x Everything',
     annualFee: 495,
     ecosystem: 'Bilt',
     color: 'bg-stone-800',
@@ -66,6 +77,7 @@ export const CARDS: CardConfig[] = [
   {
     id: 'bilt_obsidian',
     name: 'Bilt Obsidian',
+    multiplierDescription: '3x Dining • 2x Travel',
     annualFee: 95,
     ecosystem: 'Bilt',
     color: 'bg-neutral-900',
@@ -79,6 +91,7 @@ export const CARDS: CardConfig[] = [
   {
     id: 'bilt_blue',
     name: 'Bilt Blue',
+    multiplierDescription: '1x Everything',
     annualFee: 0,
     ecosystem: 'Bilt',
     color: 'bg-blue-400', 
@@ -90,6 +103,7 @@ export const CARDS: CardConfig[] = [
   {
     id: 'citi',
     name: 'Citi Night',
+    multiplierDescription: '6x Evening • 3x Dining',
     annualFee: 495,
     ecosystem: 'Citi',
     color: 'bg-teal-600',
@@ -107,6 +121,7 @@ export const CARDS: CardConfig[] = [
   {
     id: 'amazon',
     name: 'Amazon Prime',
+    multiplierDescription: '5x Amazon • 2x Dining',
     annualFee: 0,
     ecosystem: 'Amazon',
     color: 'bg-slate-800', // Dark grey/black for Prime

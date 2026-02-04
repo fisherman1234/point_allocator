@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SpendCategoryDefinition, CardConfig } from '../types';
-import { GripVertical, ChevronDown, ChevronRight, X, Gift } from 'lucide-react';
+import { GripVertical, ChevronDown, ChevronRight, X, Gift, TrendingUp, Zap, Car } from 'lucide-react';
 import { DEFAULT_SPEND_CATS } from '../constants';
 import { getCardCategoryId } from '../services/simulationService';
 
@@ -34,15 +34,25 @@ export const DraggableSpendChip: React.FC<DraggableSpendChipProps> = ({ cat, val
   );
 };
 
+interface BiltSettings {
+  rent: boolean;
+  accelerator: boolean;
+  lyft: boolean;
+}
+
 interface CardDropZoneProps {
   card: CardConfig;
   allocations: Record<string, string>;
   spendValues: Record<string, number>;
   onDrop: (catId: string, cardId: string) => void;
   onRemove: (catId: string) => void;
+  biltSettings?: BiltSettings;
+  onUpdateBiltSetting?: (field: string, value: boolean) => void;
 }
 
-export const CardDropZone: React.FC<CardDropZoneProps> = ({ card, allocations, spendValues, onDrop, onRemove }) => {
+export const CardDropZone: React.FC<CardDropZoneProps> = ({ 
+  card, allocations, spendValues, onDrop, onRemove, biltSettings, onUpdateBiltSetting 
+}) => {
   const [isOver, setIsOver] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -156,6 +166,51 @@ export const CardDropZone: React.FC<CardDropZoneProps> = ({ card, allocations, s
                   +{(totalAssignedSpend * 0.1).toLocaleString(undefined, {maximumFractionDigits: 0})} pts
                 </span>
              </div>
+          )}
+
+          {/* Bilt Settings */}
+          {biltSettings && onUpdateBiltSetting && (
+            <div className="mt-4 pt-3 border-t border-slate-100">
+                <div className="text-[10px] font-bold text-slate-400 uppercase mb-2">Bilt Configuration</div>
+                <div className="space-y-2">
+                    <label className={`flex items-center justify-between p-2 rounded-lg border cursor-pointer transition-colors ${biltSettings.rent ? 'bg-emerald-50 border-emerald-100' : 'border-slate-100 hover:bg-slate-50'}`}>
+                        <div className="flex items-center gap-2">
+                            <TrendingUp size={14} className={biltSettings.rent ? 'text-emerald-600' : 'text-slate-400'} />
+                            <span className="text-xs font-medium text-slate-700">Rent Redemption</span>
+                        </div>
+                        <input 
+                            type="checkbox" 
+                            checked={biltSettings.rent} 
+                            onChange={(e) => onUpdateBiltSetting('useBiltCashForRent', e.target.checked)} 
+                            className="accent-emerald-600"
+                        />
+                    </label>
+                    <label className={`flex items-center justify-between p-2 rounded-lg border cursor-pointer transition-colors ${biltSettings.accelerator ? 'bg-amber-50 border-amber-100' : 'border-slate-100 hover:bg-slate-50'}`}>
+                        <div className="flex items-center gap-2">
+                            <Zap size={14} className={biltSettings.accelerator ? 'text-amber-600' : 'text-slate-400'} />
+                            <span className="text-xs font-medium text-slate-700">Accelerator</span>
+                        </div>
+                        <input 
+                            type="checkbox" 
+                            checked={biltSettings.accelerator} 
+                            onChange={(e) => onUpdateBiltSetting('useBiltAccelerator', e.target.checked)} 
+                            className="accent-amber-600"
+                        />
+                    </label>
+                    <label className={`flex items-center justify-between p-2 rounded-lg border cursor-pointer transition-colors ${biltSettings.lyft ? 'bg-pink-50 border-pink-100' : 'border-slate-100 hover:bg-slate-50'}`}>
+                        <div className="flex items-center gap-2">
+                            <Car size={14} className={biltSettings.lyft ? 'text-pink-600' : 'text-slate-400'} />
+                            <span className="text-xs font-medium text-slate-700">Redeem $10/mo for Lyft</span>
+                        </div>
+                        <input 
+                            type="checkbox" 
+                            checked={biltSettings.lyft} 
+                            onChange={(e) => onUpdateBiltSetting('useLyftCredit', e.target.checked)} 
+                            className="accent-pink-600"
+                        />
+                    </label>
+                </div>
+            </div>
           )}
         </div>
       )}

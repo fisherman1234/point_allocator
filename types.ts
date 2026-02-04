@@ -2,6 +2,13 @@ import { LucideIcon } from 'lucide-react';
 
 export type Ecosystem = 'Chase' | 'Bilt' | 'Citi' | 'Amazon';
 
+export interface EcosystemConfig {
+  id: Ecosystem;
+  label: string;
+  valuation: number; // Cents per point
+  color: string;
+}
+
 export interface CardCategory {
   id: string;
   label: string;
@@ -20,6 +27,7 @@ export interface CardCredit {
 export interface CardConfig {
   id: string;
   name: string;
+  multiplierDescription: string;
   annualFee: number;
   ecosystem: Ecosystem;
   color: string;
@@ -95,6 +103,7 @@ export interface Scenario {
   useBiltCashForRent: boolean;
   useBiltAccelerator: boolean;
   useLyftCredit: boolean;
+  isDetailsExpanded: boolean;
 }
 
 export interface ScenarioData extends Scenario {

@@ -3,10 +3,10 @@ import {
   PieChart, Plus, X, Copy, LineChart as LineChartIcon, 
   Trash2, Loader2, XCircle, ChevronUp, ChevronDown, 
   Rocket, Home, DollarSign, ShieldCheck, Trophy, Coins,
-  Zap, Car, TrendingUp, Sparkles
+  Sparkles
 } from 'lucide-react';
 
-import { CARDS, DEFAULT_SPEND_CATS, INITIAL_RENT, INITIAL_CASH, INITIAL_MIN_BALANCE } from './constants';
+import { CARDS, DEFAULT_SPEND_CATS, INITIAL_RENT, INITIAL_CASH, INITIAL_MIN_BALANCE, ECOSYSTEMS } from './constants';
 import { BoostSettings, Scenario, ScenarioData, CardConfig } from './types';
 import { simulateYear } from './services/simulationService';
 import { DraggableSpendChip, CardDropZone } from './components/DraggableComponents';
@@ -65,7 +65,8 @@ export default function App() {
       activeCardIds: ['csr', 'ink', 'bilt', 'citi'],
       useBiltCashForRent: false,
       useBiltAccelerator: false,
-      useLyftCredit: false
+      useLyftCredit: false,
+      isDetailsExpanded: false
     }
   ]);
   const [chartScenarioId, setChartScenarioId] = useState<number | null>(null);
@@ -105,9 +106,9 @@ export default function App() {
       // Update Total Cash to include realized Lyft value
       const totalCash = amazonCash + realizableBiltCash + simulation.totalLyftRedeemed;
       
-      const valChase = simulation.annualTotals.Chase * 0.02;
-      const valBilt = simulation.annualTotals.Bilt * 0.02;
-      const valCiti = simulation.annualTotals.Citi * 0.015;
+      const valChase = simulation.annualTotals.Chase * (ECOSYSTEMS.Chase.valuation / 100);
+      const valBilt = simulation.annualTotals.Bilt * (ECOSYSTEMS.Bilt.valuation / 100);
+      const valCiti = simulation.annualTotals.Citi * (ECOSYSTEMS.Citi.valuation / 100);
 
       // Calculate Total Points Value for Summary Row
       const totalPointsVal = valChase + valBilt + valCiti;
@@ -263,7 +264,8 @@ export default function App() {
       activeCardIds: [...globalAvailableCardIds],
       useBiltCashForRent: false, 
       useBiltAccelerator: false, 
-      useLyftCredit: false 
+      useLyftCredit: false,
+      isDetailsExpanded: false
     }]);
   };
 
@@ -285,6 +287,12 @@ export default function App() {
   const updateScenarioField = (scenarioId: number, field: string, value: any) => {
     setScenarios(prev => prev.map(s => 
       s.id === scenarioId ? { ...s, [field]: value } : s
+    ));
+  };
+  
+  const toggleDetails = (scenarioId: number) => {
+    setScenarios(prev => prev.map(s =>
+      s.id === scenarioId ? { ...s, isDetailsExpanded: !s.isDetailsExpanded } : s
     ));
   };
 
@@ -381,9 +389,9 @@ export default function App() {
                             subset
                          );
                          
-                         const valChase = sim.annualTotals.Chase * 0.02;
-                         const valBilt = sim.annualTotals.Bilt * 0.02;
-                         const valCiti = sim.annualTotals.Citi * 0.015;
+                         const valChase = sim.annualTotals.Chase * (ECOSYSTEMS.Chase.valuation / 100);
+                         const valBilt = sim.annualTotals.Bilt * (ECOSYSTEMS.Bilt.valuation / 100);
+                         const valCiti = sim.annualTotals.Citi * (ECOSYSTEMS.Citi.valuation / 100);
                          
                          const amazonCash = sim.annualTotals.Amazon / 100;
                          const biltCash = Math.min(100, sim.finalBiltCash);
@@ -425,7 +433,8 @@ export default function App() {
           activeCardIds: item.activeCardIds,
           useBiltCashForRent: item.useBiltCashForRent,
           useBiltAccelerator: item.useBiltAccelerator,
-          useLyftCredit: item.useLyftCredit
+          useLyftCredit: item.useLyftCredit,
+          isDetailsExpanded: false
         }));
         
        if (newScenarios.length > 0) {
@@ -702,10 +711,16 @@ export default function App() {
                     
                     {/* Monthly Top Line */}
                     <div className="flex justify-between items-end mb-3">
-                      <div>
-                        <div className="text-[10px] uppercase font-bold text-slate-400">Avg Monthly Pts</div>
-                        <div className="text-2xl font-black text-slate-800">{scenario.monthlyPointsDisplay.toLocaleString()}</div>
-                      </div>
+                       <div className="flex gap-4">
+                          <div>
+                            <div className="text-[10px] uppercase font-bold text-slate-400">Total Pts (Yr)</div>
+                            <div className="text-xl font-black text-slate-800">{scenario.annualTotalPoints.toLocaleString()}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase font-bold text-slate-400">Net Value</div>
+                             <div className="text-xl font-black text-emerald-600">${scenario.annualTotalValue.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
+                          </div>
+                       </div>
                       <button 
                         onClick={() => setChartScenarioId(scenario.id)}
                         className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded flex items-center gap-1 mb-1 transition-colors"
@@ -715,30 +730,32 @@ export default function App() {
                     </div>
 
                     {/* Annual Breakdown Block */}
-                    <div className="bg-slate-50 rounded-lg p-2.5 border border-slate-100">
-                      <div className="flex justify-between items-center mb-2">
+                    <div className="bg-slate-50 rounded-lg p-2.5 border border-slate-100 transition-all">
+                      <div className="flex justify-between items-center mb-2 cursor-pointer select-none" onClick={() => toggleDetails(scenario.id)}>
                           <div className="flex items-center gap-1.5">
                               <Trophy size={12} className="text-blue-500" />
-                              <span className="text-[10px] uppercase font-bold text-slate-500">Points (Annual)</span>
+                              <span className="text-[10px] uppercase font-bold text-slate-500">Annual Breakdown</span>
                           </div>
+                          {scenario.isDetailsExpanded ? <ChevronUp size={14} className="text-slate-400"/> : <ChevronDown size={14} className="text-slate-400"/>}
                       </div>
                       
-                      <div className="space-y-1.5 mb-3">
+                      {scenario.isDetailsExpanded && (
+                        <div className="space-y-1.5 mb-3 animate-in slide-in-from-top-1 duration-200">
                           {/* Chase */}
                           <div className="grid grid-cols-[1fr_auto_auto] gap-2 text-xs items-center">
-                              <span className="text-blue-600 font-medium">Chase</span>
+                              <span className="text-blue-600 font-medium">Chase <span className="text-[10px] text-slate-400 font-normal">({ECOSYSTEMS.Chase.valuation}¢)</span></span>
                               <span className="font-bold text-slate-700 text-right">{scenario.simulation.annualTotals.Chase.toLocaleString()}</span>
                               <span className="text-slate-400 font-mono text-right w-14">${scenario.valChase.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
                           </div>
                           {/* Bilt */}
                           <div className="grid grid-cols-[1fr_auto_auto] gap-2 text-xs items-center">
-                              <span className="text-stone-600 font-medium">Bilt</span>
+                              <span className="text-stone-600 font-medium">Bilt <span className="text-[10px] text-slate-400 font-normal">({ECOSYSTEMS.Bilt.valuation}¢)</span></span>
                               <span className="font-bold text-slate-700 text-right">{scenario.simulation.annualTotals.Bilt.toLocaleString()}</span>
                               <span className="text-slate-400 font-mono text-right w-14">${scenario.valBilt.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
                           </div>
                           {/* Citi */}
                           <div className="grid grid-cols-[1fr_auto_auto] gap-2 text-xs items-center">
-                              <span className="text-teal-600 font-medium">Citi</span>
+                              <span className="text-teal-600 font-medium">Citi <span className="text-[10px] text-slate-400 font-normal">({ECOSYSTEMS.Citi.valuation}¢)</span></span>
                               <span className="font-bold text-slate-700 text-right">{scenario.simulation.annualTotals.Citi.toLocaleString()}</span>
                               <span className="text-slate-400 font-mono text-right w-14">${scenario.valCiti.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
                           </div>
@@ -757,75 +774,73 @@ export default function App() {
                                 <span className="font-bold">+{scenario.simulation.totalCSPAnniversaryBonus.toLocaleString()} pts</span>
                             </div>
                           )}
-                      </div>
 
-                      <div className="border-t border-slate-200 my-2"></div>
+                          <div className="border-t border-slate-200 my-2"></div>
 
-                      <div className="flex justify-between items-center mb-2">
-                          <div className="flex items-center gap-1.5">
-                              <Coins size={12} className="text-emerald-500" />
-                              <span className="text-[10px] uppercase font-bold text-slate-500">Cash ($)</span>
+                          <div className="flex justify-between items-center mb-2">
+                              <div className="flex items-center gap-1.5">
+                                  <Coins size={12} className="text-emerald-500" />
+                                  <span className="text-[10px] uppercase font-bold text-slate-500">Cash ($)</span>
+                              </div>
+                              <span className="text-xs font-black text-slate-800 bg-white px-1.5 py-0.5 rounded border border-slate-200 shadow-sm">
+                                  ${scenario.annualTotalCash.toLocaleString(undefined, {maximumFractionDigits: 0})}
+                              </span>
                           </div>
-                          <span className="text-xs font-black text-slate-800 bg-white px-1.5 py-0.5 rounded border border-slate-200 shadow-sm">
-                              ${scenario.annualTotalCash.toLocaleString(undefined, {maximumFractionDigits: 0})}
-                          </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-                          <div className="flex justify-between text-xs">
-                              <span className="text-emerald-600 font-medium">Bilt (Bal)</span>
-                              <span className="font-bold text-slate-700">${scenario.annualBiltCash.toLocaleString(undefined, {maximumFractionDigits:0})}</span>
-                          </div>
-                          {scenario.simulation.totalLyftRedeemed > 0 && (
-                            <div className="flex justify-between text-xs">
-                                <span className="text-pink-600 font-medium">Bilt (Realized)</span>
-                                <span className="font-bold text-slate-700">${scenario.simulation.totalLyftRedeemed.toLocaleString(undefined, {maximumFractionDigits:0})}</span>
-                            </div>
-                          )}
-                          <div className="flex justify-between text-xs">
-                              <span className="text-yellow-600 font-medium">Amazon</span>
-                              <span className="font-bold text-slate-700">${scenario.annualAmazonCash.toLocaleString(undefined, {maximumFractionDigits:0})}</span>
-                          </div>
-                      </div>
-
-                      <div className="border-t border-slate-200 my-3 pt-2">
-                          <div className="space-y-1 mb-2 border-b border-slate-100 pb-2">
-                              <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Fees & Credits</div>
-                              {scenario.scenarioActiveCards.map(card => (
-                                  <React.Fragment key={card.id}>
-                                      {card.annualFee > 0 && (
-                                          <div className="flex justify-between text-xs text-red-500">
-                                              <span>{card.name} Fee</span>
-                                              <span>-${card.annualFee}</span>
-                                          </div>
-                                      )}
-                                      {card.credits?.map((credit) => {
-                                          const creditVal = creditValues[`${card.id}-${credit.id}`] ?? credit.defaultUserValue;
-                                          return (
-                                            <div key={`${card.id}-credit-${credit.id}`} className="flex justify-between text-xs text-emerald-600">
-                                                <span>{card.name} {credit.label}</span>
-                                                <span title={`Face Value: $${credit.faceValue}`}>+${creditVal}</span>
-                                            </div>
-                                          );
-                                      })}
-                                  </React.Fragment>
-                              ))}
-                              <div className="flex justify-between text-xs font-bold text-slate-600 pt-1 mt-1 border-t border-slate-100/50">
-                                  <span>Total Fees & Credits</span>
-                                  <span className={(scenario.annualCredits - scenario.annualFees) >= 0 ? 'text-emerald-600' : 'text-red-500'}>
-                                      {(scenario.annualCredits - scenario.annualFees) >= 0 ? '+' : '-'}${Math.abs(scenario.annualCredits - scenario.annualFees).toLocaleString()}
-                                  </span>
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                              <div className="flex justify-between text-xs">
+                                  <span className="text-emerald-600 font-medium">Bilt (Bal)</span>
+                                  <span className="font-bold text-slate-700">${scenario.annualBiltCash.toLocaleString(undefined, {maximumFractionDigits:0})}</span>
+                              </div>
+                              {scenario.simulation.totalLyftRedeemed > 0 && (
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-pink-600 font-medium">Bilt (Realized)</span>
+                                    <span className="font-bold text-slate-700">${scenario.simulation.totalLyftRedeemed.toLocaleString(undefined, {maximumFractionDigits:0})}</span>
+                                </div>
+                              )}
+                              <div className="flex justify-between text-xs">
+                                  <span className="text-yellow-600 font-medium">Amazon</span>
+                                  <span className="font-bold text-slate-700">${scenario.annualAmazonCash.toLocaleString(undefined, {maximumFractionDigits:0})}</span>
                               </div>
                           </div>
 
-                          <div className="flex justify-between items-center bg-white p-2 rounded border border-indigo-100 shadow-sm mt-2">
-                              <span className="text-xs font-bold text-indigo-900 uppercase">Net Value</span>
-                              <span className="text-sm font-black text-indigo-600">
-                                  ${scenario.annualTotalValue.toLocaleString(undefined, {maximumFractionDigits: 0})}
-                              </span>
+                          <div className="border-t border-slate-200 my-3 pt-2">
+                              <div className="space-y-1 mb-2 border-b border-slate-100 pb-2">
+                                  <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Fees & Credits</div>
+                                  {scenario.scenarioActiveCards.map(card => (
+                                      <React.Fragment key={card.id}>
+                                          {card.annualFee > 0 && (
+                                              <div className="flex justify-between text-xs text-red-500">
+                                                  <span>{card.name} Fee</span>
+                                                  <span>-${card.annualFee}</span>
+                                              </div>
+                                          )}
+                                          {card.credits?.map((credit) => {
+                                              const creditVal = creditValues[`${card.id}-${credit.id}`] ?? credit.defaultUserValue;
+                                              return (
+                                                <div key={`${card.id}-credit-${credit.id}`} className="flex justify-between text-xs text-emerald-600">
+                                                    <span>{card.name} {credit.label}</span>
+                                                    <span title={`Face Value: $${credit.faceValue}`}>+${creditVal}</span>
+                                                </div>
+                                              );
+                                          })}
+                                      </React.Fragment>
+                                  ))}
+                                  <div className="flex justify-between text-xs font-bold text-slate-600 pt-1 mt-1 border-t border-slate-100/50">
+                                      <span>Total Fees & Credits</span>
+                                      <span className={(scenario.annualCredits - scenario.annualFees) >= 0 ? 'text-emerald-600' : 'text-red-500'}>
+                                          {(scenario.annualCredits - scenario.annualFees) >= 0 ? '+' : '-'}${Math.abs(scenario.annualCredits - scenario.annualFees).toLocaleString()}
+                                      </span>
+                                  </div>
+                              </div>
                           </div>
-                          <div className="text-[9px] text-center text-slate-400 mt-1.5">
-                             (Net of Fees • Chase/Bilt 2¢, Citi 1.5¢)
-                          </div>
+                        </div>
+                      )}
+
+                      <div className={`flex justify-between items-center bg-white p-2 rounded border border-indigo-100 shadow-sm ${scenario.isDetailsExpanded ? '' : 'mt-0'}`}>
+                          <span className="text-xs font-bold text-indigo-900 uppercase">Net Value</span>
+                          <span className="text-sm font-black text-indigo-600">
+                              ${scenario.annualTotalValue.toLocaleString(undefined, {maximumFractionDigits: 0})}
+                          </span>
                       </div>
                     </div>
                   </div>
@@ -858,51 +873,15 @@ export default function App() {
                         spendValues={spendValues}
                         onDrop={(catId, cardId) => handleDrop(scenario.id, catId, cardId)}
                         onRemove={(catId) => handleRemoveAllocation(scenario.id, catId)}
+                        biltSettings={card.ecosystem === 'Bilt' ? {
+                            rent: scenario.useBiltCashForRent,
+                            accelerator: scenario.useBiltAccelerator,
+                            lyft: scenario.useLyftCredit
+                        } : undefined}
+                        onUpdateBiltSetting={(field, val) => updateScenarioField(scenario.id, field, val)}
                       />
                     ))}
                   </div>
-
-                  {/* Bilt Toggles Footer */}
-                  {scenario.scenarioActiveCards.some(c => c.id.startsWith('bilt')) && (
-                    <div className="p-4 bg-white border-t border-slate-200 space-y-2">
-                      <label className={`flex items-center justify-between p-2 rounded-lg cursor-pointer border ${scenario.useBiltCashForRent ? 'bg-emerald-50 border-emerald-200' : 'border-transparent hover:bg-slate-50'}`}>
-                        <div className="flex items-center gap-2">
-                          <TrendingUp size={14} className={scenario.useBiltCashForRent ? 'text-emerald-600' : 'text-slate-400'} />
-                          <span className="text-xs font-bold text-slate-700">Rent Redemption</span>
-                        </div>
-                        <input 
-                          type="checkbox" 
-                          checked={scenario.useBiltCashForRent}
-                          onChange={(e) => updateScenarioField(scenario.id, 'useBiltCashForRent', e.target.checked)}
-                          className="accent-emerald-600"
-                        />
-                      </label>
-                      <label className={`flex items-center justify-between p-2 rounded-lg cursor-pointer border ${scenario.useBiltAccelerator ? 'bg-amber-50 border-amber-200' : 'border-transparent hover:bg-slate-50'}`}>
-                        <div className="flex items-center gap-2">
-                          <Zap size={14} className={scenario.useBiltAccelerator ? 'text-amber-600' : 'text-slate-400'} />
-                          <span className="text-xs font-bold text-slate-700">Accelerator</span>
-                        </div>
-                        <input 
-                          type="checkbox" 
-                          checked={scenario.useBiltAccelerator}
-                          onChange={(e) => updateScenarioField(scenario.id, 'useBiltAccelerator', e.target.checked)}
-                          className="accent-amber-600"
-                        />
-                      </label>
-                      <label className={`flex items-center justify-between p-2 rounded-lg cursor-pointer border ${scenario.useLyftCredit ? 'bg-pink-50 border-pink-200' : 'border-transparent hover:bg-slate-50'}`}>
-                        <div className="flex items-center gap-2">
-                          <Car size={14} className={scenario.useLyftCredit ? 'text-pink-600' : 'text-slate-400'} />
-                          <span className="text-xs font-bold text-slate-700">Redeem $10/mo for Lyft</span>
-                        </div>
-                        <input 
-                          type="checkbox" 
-                          checked={scenario.useLyftCredit}
-                          onChange={(e) => updateScenarioField(scenario.id, 'useLyftCredit', e.target.checked)}
-                          className="accent-pink-600"
-                        />
-                      </label>
-                    </div>
-                  )}
 
                 </div>
               );
