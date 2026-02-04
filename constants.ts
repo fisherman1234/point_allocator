@@ -29,9 +29,9 @@ export const CARDS: CardConfig[] = [
       { id: 'travel', label: 'Travel Credit', faceValue: 300, defaultUserValue: 300 },
       { id: 'stubhub', label: 'StubHub Credit', faceValue: 300, defaultUserValue: 200 },
       { id: 'lyft', label: 'Lyft Credit', faceValue: 120, defaultUserValue: 120 },
-      { id: 'apple', label: 'Apple Subscriptions', faceValue: 288, defaultUserValue: 288 },
+      { id: 'apple', label: 'Apple Subscriptions', faceValue: 288, defaultUserValue: 140 }, // Eq: YouTube Premium
       { id: 'dining', label: 'Dining Credit', faceValue: 300, defaultUserValue: 300 },
-      { id: 'doordash', label: 'DoorDash Promos', faceValue: 300, defaultUserValue: 200 }
+      { id: 'doordash', label: 'DoorDash Promos', faceValue: 300, defaultUserValue: 150 } // Hard to redeem
     ]
   },
   {
@@ -48,7 +48,7 @@ export const CARDS: CardConfig[] = [
       { id: 'base', label: 'Other Spend', multiplier: 1, icon: DollarSign, accepts: ['base', 'amazon_spend', 'internet'] },
     ],
     credits: [
-      { id: 'doordash', label: 'DoorDash Promos', faceValue: 120, defaultUserValue: 80 }
+      { id: 'doordash', label: 'DoorDash Promos', faceValue: 120, defaultUserValue: 60 } // Hard to redeem.
     ]
   },
   {
